@@ -179,6 +179,10 @@ func attrEscape(out *bytes.Buffer, src []byte) {
 	}
 }
 
+func AttrEscape(out *bytes.Buffer, src []byte) {
+	attrEscape(out, src)
+}
+
 func entityEscapeWithSkip(out *bytes.Buffer, src []byte, skipRanges [][]int) {
 	end := 0
 	for _, rang := range skipRanges {
@@ -386,19 +390,33 @@ func (options *Html) List(out *bytes.Buffer, text func() bool, flags int) {
 	}
 }
 
-func (options *Html) ListItem(out *bytes.Buffer, text []byte, flags int) {
+func HtmlListItemBegin(options *Html, out *bytes.Buffer, flags int, class string) {
 	if (flags&LIST_ITEM_CONTAINS_BLOCK != 0 && flags&LIST_TYPE_DEFINITION == 0) ||
 		flags&LIST_ITEM_BEGINNING_OF_LIST != 0 {
 		doubleSpace(out)
 	}
 	if flags&LIST_TYPE_TERM != 0 {
-		out.WriteString("<dt>")
+		if "" == class {
+			out.WriteString("<dt>")
+		} else {
+			out.WriteString(fmt.Sprintf(`<dt class="%s">`, class))
+		}
 	} else if flags&LIST_TYPE_DEFINITION != 0 {
-		out.WriteString("<dd>")
+		if "" == class {
+			out.WriteString("<dd>")
+		} else {
+			out.WriteString(fmt.Sprintf(`<dd class="%s">`, class))
+		}
 	} else {
-		out.WriteString("<li>")
+		if "" == class {
+			out.WriteString("<li>")
+		} else {
+			out.WriteString(fmt.Sprintf(`<li class="%s">`, class))
+		}
 	}
-	out.Write(text)
+}
+
+func HtmlListItemEnd(options *Html, out *bytes.Buffer, flags int, class string) {
 	if flags&LIST_TYPE_TERM != 0 {
 		out.WriteString("</dt>\n")
 	} else if flags&LIST_TYPE_DEFINITION != 0 {
@@ -406,6 +424,12 @@ func (options *Html) ListItem(out *bytes.Buffer, text []byte, flags int) {
 	} else {
 		out.WriteString("</li>\n")
 	}
+}
+
+func (options *Html) ListItem(out *bytes.Buffer, text []byte, flags int) {
+	HtmlListItemBegin(options, out, flags, "")
+	out.Write(text)
+	HtmlListItemEnd(options, out, flags, "")
 }
 
 func (options *Html) Paragraph(out *bytes.Buffer, text func() bool) {
@@ -418,6 +442,10 @@ func (options *Html) Paragraph(out *bytes.Buffer, text func() bool) {
 		return
 	}
 	out.WriteString("</p>\n")
+}
+
+func (options *Html) Emoji(out *bytes.Buffer, name string) {
+	out.WriteString(fmt.Sprintf(`<img class="emoji" src="%s" alt=":%s:"/>`, getEmojiUrl(name), name))
 }
 
 func (options *Html) AutoLink(out *bytes.Buffer, link []byte, kind int) {
@@ -532,7 +560,7 @@ func (options *Html) LineBreak(out *bytes.Buffer) {
 	out.WriteByte('\n')
 }
 
-func (options *Html) Link(out *bytes.Buffer, link []byte, title []byte, content []byte) {
+func HtmlLink(options *Html, out *bytes.Buffer, link []byte, title []byte, content []byte, class string) {
 	if options.flags&HTML_SKIP_LINKS != 0 {
 		// write the link text out but don't link it, just mark it with typewriter font
 		out.WriteString("<tt>")
@@ -549,7 +577,12 @@ func (options *Html) Link(out *bytes.Buffer, link []byte, title []byte, content 
 		return
 	}
 
-	out.WriteString("<a href=\"")
+	if "" == class {
+		out.WriteString("<a href=\"")
+	} else {
+		out.WriteString("<a class=\"" + class + "\" href=\"")
+	}
+
 	options.maybeWriteAbsolutePrefix(out, link)
 	attrEscape(out, link)
 	if len(title) > 0 {
@@ -579,6 +612,10 @@ func (options *Html) Link(out *bytes.Buffer, link []byte, title []byte, content 
 	out.Write(content)
 	out.WriteString("</a>")
 	return
+}
+
+func (options *Html) Link(out *bytes.Buffer, link []byte, title []byte, content []byte) {
+	HtmlLink(options, out, link, title, content, "")
 }
 
 func (options *Html) RawHtmlTag(out *bytes.Buffer, text []byte) {
@@ -894,6 +931,10 @@ func doubleSpace(out *bytes.Buffer) {
 	if out.Len() > 0 {
 		out.WriteByte('\n')
 	}
+}
+
+func DoubleSpace(out *bytes.Buffer) {
+	doubleSpace(out)
 }
 
 func isRelativeLink(link []byte) (yes bool) {
