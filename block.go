@@ -1140,9 +1140,11 @@ func (p *parser) listItem(out *bytes.Buffer, data []byte, flags *int) int {
 	containsBlankLine := false
 	sublist := 0
 	codeBlockMarker := ""
+	codeBlockIndent := 0
 	if p.flags&EXTENSION_FENCED_CODE != 0 && i > line {
 		// determine if codeblock starts on the first line
 		_, codeBlockMarker = isFenceLine(data[line:i], nil, "", false)
+		codeBlockIndent = itemIndent
 	}
 
 	// get working buffer
@@ -1151,6 +1153,8 @@ func (p *parser) listItem(out *bytes.Buffer, data []byte, flags *int) int {
 	// put the first line into the working buffer
 	raw.Write(data[line:i])
 	line = i
+
+	firstIndent := 0 // Fix for problems if (e.g.) 2 spaces are used instead of 4.
 
 gatherlines:
 	for line < len(data) {
@@ -1169,10 +1173,22 @@ gatherlines:
 			continue
 		}
 
+		maxIndent := 4 // Infer indentation, default of 4.
+		if 0 != firstIndent {
+			maxIndent = firstIndent + 1
+		}
+
 		// calculate the indentation
 		indent := 0
-		for indent < 4 && line+indent < i && data[line+indent] == ' ' {
-			indent++
+		if codeBlockMarker != "" {
+			indent = codeBlockIndent
+		} else {
+			for indent < maxIndent && line+indent < i && data[line+indent] == ' ' {
+				indent++
+			}
+			if 0 == firstIndent {
+				firstIndent = indent
+			}
 		}
 
 		chunk := data[line+indent : i]
@@ -1185,10 +1201,12 @@ gatherlines:
 				if codeBlockMarker == "" {
 					// start of codeblock
 					codeBlockMarker = marker
+					codeBlockIndent = indent
 				} else {
 					// end of codeblock.
 					*flags |= LIST_ITEM_CONTAINS_BLOCK
 					codeBlockMarker = ""
+					codeBlockIndent = 0
 				}
 			}
 			// we are in a codeblock, write line, and continue
@@ -1233,16 +1251,16 @@ gatherlines:
 		case p.isPrefixHeader(chunk):
 			// if the header is not indented, it is not nested in the list
 			// and thus ends the list
-			if containsBlankLine && indent < 4 {
+			if containsBlankLine && indent < maxIndent {
 				*flags |= LIST_ITEM_END_OF_LIST
 				break gatherlines
 			}
 			*flags |= LIST_ITEM_CONTAINS_BLOCK
 
 		// anything following an empty line is only part
-		// of this item if it is indented 4 spaces
+		// of this item if it is indented maxIndent spaces
 		// (regardless of the indentation of the beginning of the item)
-		case containsBlankLine && indent < 4:
+		case containsBlankLine && indent < maxIndent:
 			if *flags&LIST_TYPE_DEFINITION != 0 && i < len(data)-1 {
 				// is the next item still a part of this list?
 				next := i
