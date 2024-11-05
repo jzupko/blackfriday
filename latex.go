@@ -184,6 +184,12 @@ func (options *Latex) FootnoteItem(out *bytes.Buffer, name, text []byte, flags i
 
 }
 
+func (options *Latex) Emoji(out *bytes.Buffer, name string) {
+	out.WriteString("\\includegraphics{")
+	out.WriteString(name + ".svg")
+	out.WriteString("}")
+}
+
 func (options *Latex) AutoLink(out *bytes.Buffer, link []byte, kind int) {
 	out.WriteString("\\href{")
 	if kind == LINK_TYPE_EMAIL {

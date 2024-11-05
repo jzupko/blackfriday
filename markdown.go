@@ -45,6 +45,7 @@ const (
 	EXTENSION_DEFINITION_LISTS                       // render definition lists
 	EXTENSION_JOIN_LINES                             // delete newline and join lines
 	EXTENSION_WIKILINKS                              // wikilinks extension
+	EXTENSION_EMOJI                                  // ::emoji:: extension
 
 	commonHtmlFlags = 0 |
 		HTML_USE_XHTML |
@@ -182,6 +183,7 @@ type Renderer interface {
 	AutoLink(out *bytes.Buffer, link []byte, kind int)
 	CodeSpan(out *bytes.Buffer, text []byte)
 	DoubleEmphasis(out *bytes.Buffer, text []byte)
+	Emoji(out *bytes.Buffer, name string)
 	Emphasis(out *bytes.Buffer, text []byte)
 	Image(out *bytes.Buffer, link []byte, title []byte, alt []byte)
 	LineBreak(out *bytes.Buffer)
@@ -381,6 +383,8 @@ func MarkdownOptions(input []byte, renderer Renderer, opts Options) []byte {
 
 	if extensions&EXTENSION_AUTOLINK != 0 {
 		p.inlineCallback[':'] = autoLink
+	} else if extensions&EXTENSION_EMOJI != 0 {
+		p.inlineCallback[':'] = emoji
 	}
 
 	if extensions&EXTENSION_FOOTNOTES != 0 {

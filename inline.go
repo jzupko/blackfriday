@@ -719,7 +719,51 @@ func linkEndsWithEntity(data []byte, linkEnd int) bool {
 	return entityRanges != nil && entityRanges[len(entityRanges)-1][1] == linkEnd
 }
 
+func getEmojiUrl(name string) string {
+	baseFilename, ok := markdownEmojiLookup[name]
+	if !ok {
+		return ""
+	}
+
+	return "/emoji/svg/" + baseFilename + ".svg"
+}
+
+func isValidEmoji(name string) bool {
+	_, ok := markdownEmojiLookup[name]
+	return ok
+}
+
+func emoji(p *parser, out *bytes.Buffer, data []byte, offset int) int {
+	// check for emoji
+	count := len(data)
+	start := offset+1
+	if start >= count {
+		return 0
+	}
+	end := bytes.IndexByte(data[start+1:], ':') + start+1
+	if end <= start {
+		return 0
+	}
+
+	name := string(data[start:end])
+
+	if !isValidEmoji(name) {
+		return 0
+	}
+
+	p.r.Emoji(out, name)
+	return end+1
+}
+
 func autoLink(p *parser, out *bytes.Buffer, data []byte, offset int) int {
+	// check for emoji first
+	if p.flags&EXTENSION_EMOJI != 0 {
+		res := emoji(p, out, data, offset)
+		if 0 != res {
+			return res
+		}
+	}
+
 	// quick check to rule out most false hits on ':'
 	if p.insideLink || len(data) < offset+3 || data[offset+1] != '/' || data[offset+2] != '/' {
 		return 0
