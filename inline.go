@@ -193,6 +193,7 @@ const (
 	linkImg
 	linkDeferredFootnote
 	linkInlineFootnote
+	linkWikiLink // [[wikilink]] style link
 )
 
 func isReferenceStyleLink(data []byte, pos int, t linkType) bool {
@@ -211,6 +212,8 @@ func link(p *parser, out *bytes.Buffer, data []byte, offset int) int {
 
 	var t linkType
 	switch {
+	case p.flags&EXTENSION_WIKILINKS != 0 && len(data)-1 > offset && data[offset+1] == '[':
+		t = linkWikiLink
 	// special case: ![^text] == deferred footnote (that follows something with
 	// an exclamation point)
 	case p.flags&EXTENSION_FOOTNOTES != 0 && len(data)-1 > offset && data[offset+1] == '^':
@@ -241,6 +244,9 @@ func link(p *parser, out *bytes.Buffer, data []byte, offset int) int {
 	)
 
 	if t == linkDeferredFootnote {
+		i++
+	}
+	if t == linkWikiLink {
 		i++
 	}
 
@@ -279,7 +285,21 @@ func link(p *parser, out *bytes.Buffer, data []byte, offset int) int {
 		i++
 	}
 
+	// Check for proper terminating wikilink - if found
+	// adjust and leave as-is.
+	if linkWikiLink == t {
+		if i < len(data) && ']' == data[i] {
+			link = data[2:txtE]
+			i++
+		} else {
+			t = linkNormal
+		}
+	}
+
 	switch {
+	case linkWikiLink == t:  Nop, handled above.
+		break
+
 	// inline style link
 	case i < len(data) && data[i] == '(':
 		// skip initial whitespace
@@ -522,16 +542,23 @@ func link(p *parser, out *bytes.Buffer, data []byte, offset int) int {
 		if t == linkImg {
 			content.Write(data[1:txtE])
 		} else {
+			var innerData []byte
+			if t == linkWikiLink {
+				innerData = data[2:txtE]
+			} else {
+				innerData = data[1:txtE]
+			}
+
 			// links cannot contain other links, so turn off link parsing temporarily
 			insideLink := p.insideLink
 			p.insideLink = true
-			p.inline(&content, data[1:txtE])
+			p.inline(&content, innerData)
 			p.insideLink = insideLink
 		}
 	}
 
 	var uLink []byte
-	if t == linkNormal || t == linkImg {
+	if t == linkNormal || t == linkImg || t== linkWikiLink {
 		if len(link) > 0 {
 			var uLinkBuf bytes.Buffer
 			unescapeText(&uLinkBuf, link)
@@ -546,7 +573,7 @@ func link(p *parser, out *bytes.Buffer, data []byte, offset int) int {
 
 	// call the relevant rendering function
 	switch t {
-	case linkNormal:
+	case linkNormal, linkWikiLink:
 		if len(altContent) > 0 {
 			p.r.Link(out, uLink, title, altContent)
 		} else {

@@ -44,6 +44,7 @@ const (
 	EXTENSION_BACKSLASH_LINE_BREAK                   // translate trailing backslashes into line breaks
 	EXTENSION_DEFINITION_LISTS                       // render definition lists
 	EXTENSION_JOIN_LINES                             // delete newline and join lines
+	EXTENSION_WIKILINKS                              // wikilinks extension
 
 	commonHtmlFlags = 0 |
 		HTML_USE_XHTML |
