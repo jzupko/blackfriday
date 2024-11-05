@@ -297,7 +297,7 @@ func link(p *parser, out *bytes.Buffer, data []byte, offset int) int {
 	}
 
 	switch {
-	case linkWikiLink == t:  Nop, handled above.
+	case linkWikiLink == t: // Nop, handled above.
 		break
 
 	// inline style link
